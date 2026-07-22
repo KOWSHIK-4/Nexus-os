@@ -26,13 +26,19 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
-    minify: 'terser',
+    minify: 'esbuild',
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['@radix-ui/react-*'],
-          charts: ['recharts'],
+        manualChunks(id: string) {
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
+            return 'vendor';
+          }
+          if (id.includes('node_modules/@radix-ui/')) {
+            return 'ui';
+          }
+          if (id.includes('node_modules/recharts')) {
+            return 'charts';
+          }
         },
       },
     },

@@ -11,6 +11,7 @@ export interface AuthPayload {
   organizationId?: string;
 }
 
+/* eslint-disable @typescript-eslint/no-namespace */
 declare global {
   namespace Express {
     interface Request {
@@ -18,6 +19,7 @@ declare global {
     }
   }
 }
+/* eslint-enable @typescript-eslint/no-namespace */
 
 export const authenticate = async (
   req: Request,
