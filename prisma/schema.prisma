@@ -1,0 +1,394 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_UPDATED
+  COMMENT_ADDED
+  MENTION
+  PROJECT_INVITE
+  TEAM_INVITE
+  DEADLINE_REMINDER
+  STATUS_CHANGE
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  settings  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users       User[]
+  projects    Project[]
+  teams       Team[]
+  workspaces  Workspace[]
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  passwordHash   String
+  firstName      String
+  lastName       String
+  avatar         String?
+  role           UserRole @default(MEMBER)
+  title          String?
+  phone          String?
+  isActive       Boolean  @default(true)
+  emailVerified  Boolean  @default(false)
+  twoFactorEnabled Boolean @default(false)
+  lastLoginAt    DateTime?
+  preferences    Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  projects       Project[]
+  ownedProjects  Project[]    @relation("ProjectOwner")
+  assignedTasks  Task[]       @relation("TaskAssignee")
+  reportedTasks  Task[]       @relation("TaskReporter")
+  comments       Comment[]
+  notifications  Notification[]
+  teamMembers    TeamMember[]
+  sessions       Session[]
+  loginHistory   LoginHistory[]
+  auditLogs      AuditLog[]
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  refreshToken String   @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+}
+
+model LoginHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  ipAddress String?
+  userAgent String?
+  success   Boolean
+  createdAt DateTime @default(now())
+}
+
+model Project {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  key         String        @unique
+  status      ProjectStatus @default(PLANNING)
+  priority    TaskPriority  @default(NONE)
+  startDate   DateTime?
+  endDate     DateTime?
+  color       String?
+  icon        String?
+  isArchived  Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  ownerId String
+  owner   User   @relation("ProjectOwner", fields: [ownerId], references: [id])
+
+  members ProjectMember[]
+  tasks   Task[]
+  boards  KanbanBoard[]
+}
+
+model ProjectMember {
+  id        String   @id @default(uuid())
+  role      UserRole @default(MEMBER)
+  createdAt DateTime @default(now())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+}
+
+model Task {
+  id          String     @id @default(uuid())
+  title       String
+  description String?
+  status      TaskStatus @default(TODO)
+  priority    TaskPriority @default(NONE)
+  storyPoints Int?
+  dueDate     DateTime?
+  estimatedHours Float?
+  loggedHours    Float?
+  order       Float      @default(0)
+  tags        String[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  assigneeId String?
+  assignee   User?   @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  reporterId String
+  reporter   User    @relation("TaskReporter", fields: [reporterId], references: [id])
+
+  parentId  String?
+  parent    Task?    @relation("TaskSubtasks", fields: [parentId], references: [id])
+  subtasks  Task[]   @relation("TaskSubtasks")
+
+  boardId      String?
+  board        KanbanBoard? @relation(fields: [boardId], references: [id])
+  boardColumnId String?
+  boardColumn  KanbanColumn? @relation(fields: [boardColumnId], references: [id])
+
+  comments  Comment[]
+  labels    TaskLabel[]
+}
+
+model TaskLabel {
+  id    String @id @default(uuid())
+  name  String
+  color String
+
+  tasks Task[]
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  taskId String
+  task   Task @relation(fields: [taskId], references: [id])
+
+  userId String
+  user   User  @relation(fields: [userId], references: [id])
+
+  parentId String?
+  parent   Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies  Comment[] @relation("CommentReplies")
+}
+
+model KanbanBoard {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  columns KanbanColumn[]
+  tasks   Task[]
+}
+
+model KanbanColumn {
+  id        String   @id @default(uuid())
+  name      String
+  color     String?
+  order     Int      @default(0)
+  wipLimit  Int?
+  createdAt DateTime @default(now())
+
+  boardId String
+  board   KanbanBoard @relation(fields: [boardId], references: [id])
+
+  tasks Task[]
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  title     String
+  content   String?
+  isPinned  Boolean  @default(false)
+  color     String?
+  tags      String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId        String
+  workspaceId   String?
+  folderId      String?
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  title     String
+  content   String?
+  icon      String?
+  isPinned  Boolean  @default(false)
+  isArchived Boolean @default(false)
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId        String
+  workspaceId   String?
+  folderId      String?
+  parentId      String?
+
+  collaborators Json?
+}
+
+model File {
+  id          String   @id @default(uuid())
+  name        String
+  originalName String
+  mimeType    String
+  size        Int
+  url         String
+  thumbnail   String?
+  folder      String?
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId    String
+  projectId String?
+}
+
+model Team {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  members TeamMember[]
+}
+
+model TeamMember {
+  id        String   @id @default(uuid())
+  role      UserRole @default(MEMBER)
+  createdAt DateTime @default(now())
+
+  teamId String
+  team   Team @relation(fields: [teamId], references: [id])
+
+  userId String
+  user   User  @relation(fields: [userId], references: [id])
+
+  @@unique([teamId, userId])
+}
+
+model Channel {
+  id        String   @id @default(uuid())
+  name      String
+  topic     String?
+  isPrivate Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages Message[]
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  channelId String
+  channel   Channel @relation(fields: [channelId], references: [id])
+
+  senderId String
+  sender   User    @relation(fields: [senderId], references: [id])
+
+  parentId String?
+  parent   Message? @relation("MessageReplies", fields: [parentId], references: [id])
+  replies  Message[] @relation("MessageReplies")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  type      NotificationType
+  title     String
+  message   String?
+  data      Json?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Workspace {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  icon      String?
+  settings  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  entity    String
+  entityId  String?
+  details   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+}
