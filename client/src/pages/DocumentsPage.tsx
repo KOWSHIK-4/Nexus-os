@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 import { useState } from 'react';
-import { Plus, Search, FileText, Folder, MoreHorizontal } from 'lucide-react';
-import { Card, CardContent } from '../components/ui/card';
+import { Plus, Search, Folder, MoreHorizontal } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { formatRelativeTime } from '../lib/utils';
@@ -64,7 +63,7 @@ export function DocumentsPage() {
                   <span className="text-2xl">{doc.icon}</span>
                   <div>
                     <p className="font-medium">{doc.title}</p>
-                    <p className="text-xs text-muted-foreground">{doc.folder} · {formatRelativeTime(doc.updatedAt)}</p>
+                    <p className="text-xs text-muted-foreground">{doc.folder} ï¿½ {formatRelativeTime(doc.updatedAt)}</p>
                   </div>
                 </div>
                 <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>

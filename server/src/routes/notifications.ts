@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth';
 import { prisma } from '../utils/prisma';
@@ -19,24 +18,17 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const where: Record<string, unknown> = { userId: req.user!.userId };
 
     if (read === 'true') {
-      where.read = true;
+      where.isRead = true;
     } else if (read === 'false') {
-      where.read = false;
+      where.isRead = false;
     }
 
-    if (type) {
-      where.type = type;
-    }
+    if (type) where.type = type;
 
     const [notifications, total, unreadCount] = await Promise.all([
-      prisma.notification.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
+      prisma.notification.findMany({ where, skip, take: limit, orderBy: { createdAt: 'desc' } }),
       prisma.notification.count({ where }),
-      prisma.notification.count({ where: { userId: req.user!.userId, read: false } }),
+      prisma.notification.count({ where: { userId: req.user!.userId, isRead: false } }),
     ]);
 
     res.json({
@@ -52,10 +44,9 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 router.put('/read-all', async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.notification.updateMany({
-      where: { userId: req.user!.userId, read: false },
-      data: { read: true },
+      where: { userId: req.user!.userId, isRead: false },
+      data: { isRead: true },
     });
-
     res.json({ data: { message: 'All notifications marked as read' } });
   } catch (error) {
     next(error);
@@ -64,21 +55,15 @@ router.put('/read-all', async (req: Request, res: Response, next: NextFunction) 
 
 router.put('/:id/read', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const notification = await prisma.notification.findUnique({
-      where: { id: req.params.id },
-    });
-
-    if (!notification) {
-      throw new NotFoundError('Notification');
-    }
-
+    const notification = await prisma.notification.findUnique({ where: { id: req.params.id } });
+    if (!notification) throw new NotFoundError('Notification');
     if (notification.userId !== req.user!.userId) {
       throw new AppError('You can only mark your own notifications as read', 403, 'FORBIDDEN');
     }
 
     const updated = await prisma.notification.update({
       where: { id: req.params.id },
-      data: { read: true },
+      data: { isRead: true },
     });
 
     res.json({ data: updated });

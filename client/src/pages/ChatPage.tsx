@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 import { useState } from 'react';
-import { Send, Hash, Plus, Users, Search } from 'lucide-react';
-import { Card, CardContent } from '../components/ui/card';
+import { Send, Hash, Plus, Users } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Avatar, AvatarFallback } from '../components/ui/avatar';
@@ -43,7 +42,7 @@ export function ChatPage() {
         <div className="pt-4 border-t border-border">
           <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
             <Users className="h-4 w-4" />
-            Online — 5 members
+            Online ï¿½ 5 members
           </button>
         </div>
       </div>

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth';
 import { prisma } from '../utils/prisma';
@@ -10,20 +9,8 @@ router.use(authenticate);
 
 router.get('/channels', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const projectId = req.query.projectId as string | undefined;
-
-    const where: Record<string, unknown> = {};
-
-    if (projectId) {
-      where.projectId = projectId;
-    }
-
     const channels = await prisma.channel.findMany({
-      where,
-      include: {
-        project: { select: { id: true, name: true } },
-        _count: { select: { messages: true } },
-      },
+      include: { _count: { select: { messages: true } } },
       orderBy: { updatedAt: 'desc' },
     });
 
@@ -35,22 +22,11 @@ router.get('/channels', async (req: Request, res: Response, next: NextFunction) 
 
 router.post('/channels', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, description, type, projectId } = req.body;
-
-    if (!name) {
-      throw new AppError('Channel name is required', 400, 'VALIDATION_ERROR');
-    }
+    const { name, topic, isPrivate } = req.body;
+    if (!name) throw new AppError('Channel name is required', 400, 'VALIDATION_ERROR');
 
     const channel = await prisma.channel.create({
-      data: {
-        name,
-        description: description || '',
-        type: type || 'PUBLIC',
-        projectId: projectId || null,
-      },
-      include: {
-        project: { select: { id: true, name: true } },
-      },
+      data: { name, topic: topic || '', isPrivate: isPrivate || false },
     });
 
     res.status(201).json({ data: channel });
@@ -67,15 +43,13 @@ router.get('/messages/:channelId', async (req: Request, res: Response, next: Nex
     const skip = (page - 1) * limit;
 
     const channel = await prisma.channel.findUnique({ where: { id: channelId } });
-    if (!channel) {
-      throw new NotFoundError('Channel');
-    }
+    if (!channel) throw new NotFoundError('Channel');
 
     const [messages, total] = await Promise.all([
       prisma.message.findMany({
         where: { channelId },
         include: {
-          author: { select: { id: true, name: true, email: true, avatar: true } },
+          sender: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
         },
         skip,
         take: limit,
@@ -96,30 +70,16 @@ router.get('/messages/:channelId', async (req: Request, res: Response, next: Nex
 router.post('/messages', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { content, channelId } = req.body;
-
-    if (!content || !channelId) {
-      throw new AppError('Content and channelId are required', 400, 'VALIDATION_ERROR');
-    }
+    if (!content || !channelId) throw new AppError('Content and channelId are required', 400, 'VALIDATION_ERROR');
 
     const channel = await prisma.channel.findUnique({ where: { id: channelId } });
-    if (!channel) {
-      throw new NotFoundError('Channel');
-    }
+    if (!channel) throw new NotFoundError('Channel');
 
     const message = await prisma.message.create({
-      data: {
-        content,
-        channelId,
-        authorId: req.user!.userId,
-      },
+      data: { content, channelId, senderId: req.user!.userId },
       include: {
-        author: { select: { id: true, name: true, email: true, avatar: true } },
+        sender: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
       },
-    });
-
-    await prisma.channel.update({
-      where: { id: channelId },
-      data: { updatedAt: new Date() },
     });
 
     res.status(201).json({ data: message });
@@ -130,20 +90,14 @@ router.post('/messages', async (req: Request, res: Response, next: NextFunction)
 
 router.delete('/messages/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const message = await prisma.message.findUnique({
-      where: { id: req.params.id },
-    });
+    const message = await prisma.message.findUnique({ where: { id: req.params.id } });
+    if (!message) throw new NotFoundError('Message');
 
-    if (!message) {
-      throw new NotFoundError('Message');
-    }
-
-    if (message.authorId !== req.user!.userId && req.user!.role !== 'ADMIN' && req.user!.role !== 'OWNER') {
+    if (message.senderId !== req.user!.userId && req.user!.role !== 'ADMIN' && req.user!.role !== 'SUPER_ADMIN') {
       throw new AppError('You can only delete your own messages', 403, 'FORBIDDEN');
     }
 
     await prisma.message.delete({ where: { id: req.params.id } });
-
     res.json({ data: { message: 'Message deleted successfully' } });
   } catch (error) {
     next(error);

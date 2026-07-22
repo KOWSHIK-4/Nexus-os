@@ -4,7 +4,6 @@ import { Plus, Pin, Search, StickyNote } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Badge } from '../components/ui/badge';
 import { formatRelativeTime } from '../lib/utils';
 
 const mockNotes = [

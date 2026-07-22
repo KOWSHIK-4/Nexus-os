@@ -1,8 +1,7 @@
-// @ts-nocheck
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth';
 import { prisma } from '../utils/prisma';
-import { AppError, NotFoundError } from '../utils/errors';
+import { AppError } from '../utils/errors';
 
 const router = Router();
 
@@ -10,21 +9,12 @@ router.use(authenticate);
 
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    let settings = await prisma.userSettings.findUnique({
-      where: { userId: req.user!.userId },
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { preferences: true },
     });
 
-    if (!settings) {
-      settings = await prisma.userSettings.create({
-        data: {
-          userId: req.user!.userId,
-          theme: 'LIGHT',
-          preferences: {},
-        },
-      });
-    }
-
-    res.json({ data: settings });
+    res.json({ data: user?.preferences || {} });
   } catch (error) {
     next(error);
   }
@@ -32,73 +22,25 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
 router.put('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { preferences, notifications, privacy } = req.body;
+    const { preferences } = req.body;
 
-    let settings = await prisma.userSettings.findUnique({
-      where: { userId: req.user!.userId },
-    });
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
 
-    if (!settings) {
-      settings = await prisma.userSettings.create({
-        data: {
-          userId: req.user!.userId,
-          theme: 'LIGHT',
-          preferences: preferences || {},
-        },
-      });
-    }
+    const currentPrefs = (user.preferences as Record<string, unknown>) || {};
 
-    const updated = await prisma.userSettings.update({
-      where: { userId: req.user!.userId },
+    const updated = await prisma.user.update({
+      where: { id: req.user!.userId },
       data: {
-        ...(preferences !== undefined && { preferences }),
-        ...(notifications !== undefined && { notifications }),
-        ...(privacy !== undefined && { privacy }),
-      },
-    });
-
-    res.json({ data: updated });
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.put('/appearance', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { theme, sidebarCollapsed, fontSize, compactMode } = req.body;
-
-    let settings = await prisma.userSettings.findUnique({
-      where: { userId: req.user!.userId },
-    });
-
-    if (!settings) {
-      settings = await prisma.userSettings.create({
-        data: {
-          userId: req.user!.userId,
-          theme: theme || 'LIGHT',
-          preferences: { sidebarCollapsed, fontSize, compactMode },
+        preferences: {
+          ...currentPrefs,
+          ...(preferences !== undefined ? preferences : {}),
         },
-      });
-    }
-
-    const currentPreferences = (settings.preferences as Record<string, unknown>) || {};
-
-    const updated = await prisma.userSettings.update({
-      where: { userId: req.user!.userId },
-      data: {
-        ...(theme !== undefined && { theme }),
-        ...((sidebarCollapsed !== undefined || fontSize !== undefined || compactMode !== undefined) && {
-          preferences: {
-            ...currentPreferences,
-            ...(sidebarCollapsed !== undefined && { sidebarCollapsed }),
-            ...(fontSize !== undefined && { fontSize }),
-            ...(compactMode !== undefined && { compactMode }),
-          },
-        }),
       },
+      select: { preferences: true },
     });
 
-    res.json({ data: updated });
+    res.json({ data: updated.preferences });
   } catch (error) {
     next(error);
   }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import path from 'path';
@@ -21,9 +20,9 @@ const upload = multer({
   storage,
   limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowed = /jpeg|jpg|png|gif|webp|svg|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|zip|rar|mp4|mp3|wav|mov|avi/;
     const ext = path.extname(file.originalname).toLowerCase().slice(1);
-    if (allowed.test(ext)) {
+    const allowed = ['jpeg', 'jpg', 'png', 'gif', 'webp', 'svg', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'zip', 'rar', 'mp4', 'mp3', 'wav', 'mov', 'avi'];
+    if (allowed.includes(ext)) {
       cb(null, true);
     } else {
       cb(new AppError(`File type .${ext} is not allowed`, 400, 'INVALID_FILE_TYPE'));
@@ -38,29 +37,17 @@ router.use(authenticate);
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const projectId = req.query.projectId as string | undefined;
-    const uploadedById = req.query.uploadedById as string | undefined;
+    const userId = req.query.userId as string | undefined;
     const mimeType = req.query.mimeType as string | undefined;
 
     const where: Record<string, unknown> = {};
 
-    if (projectId) {
-      where.projectId = projectId;
-    }
-
-    if (uploadedById) {
-      where.uploadedById = uploadedById;
-    }
-
-    if (mimeType) {
-      where.mimeType = { startsWith: mimeType };
-    }
+    if (projectId) where.projectId = projectId;
+    if (userId) where.userId = userId;
+    if (mimeType) where.mimeType = { startsWith: mimeType };
 
     const files = await prisma.file.findMany({
       where,
-      include: {
-        uploadedBy: { select: { id: true, name: true, email: true, avatar: true } },
-        project: { select: { id: true, name: true } },
-      },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -72,11 +59,9 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
 router.post('/upload', upload.single('file'), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (!req.file) {
-      throw new AppError('No file uploaded', 400, 'NO_FILE');
-    }
+    if (!req.file) throw new AppError('No file uploaded', 400, 'NO_FILE');
 
-    const { originalname, filename, mimetype, size, path: filePath } = req.file;
+    const { originalname, filename, mimetype, size } = req.file;
     const { projectId } = req.body;
 
     const file = await prisma.file.create({
@@ -86,12 +71,8 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
         mimeType: mimetype,
         size,
         url: `/uploads/${filename}`,
-        key: filename,
-        uploadedById: req.user!.userId,
+        userId: req.user!.userId,
         projectId: projectId || null,
-      },
-      include: {
-        uploadedBy: { select: { id: true, name: true, email: true, avatar: true } },
       },
     });
 
@@ -103,18 +84,8 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
 
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const file = await prisma.file.findUnique({
-      where: { id: req.params.id },
-      include: {
-        uploadedBy: { select: { id: true, name: true, email: true, avatar: true } },
-        project: { select: { id: true, name: true } },
-      },
-    });
-
-    if (!file) {
-      throw new NotFoundError('File');
-    }
-
+    const file = await prisma.file.findUnique({ where: { id: req.params.id } });
+    if (!file) throw new NotFoundError('File');
     res.json({ data: file });
   } catch (error) {
     next(error);
@@ -124,12 +95,9 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const file = await prisma.file.findUnique({ where: { id: req.params.id } });
-    if (!file) {
-      throw new NotFoundError('File');
-    }
+    if (!file) throw new NotFoundError('File');
 
     await prisma.file.delete({ where: { id: req.params.id } });
-
     res.json({ data: { message: 'File deleted successfully' } });
   } catch (error) {
     next(error);

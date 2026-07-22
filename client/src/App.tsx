@@ -4,6 +4,8 @@ import { MainLayout } from './layouts/MainLayout';
 import { AuthLayout } from './layouts/AuthLayout';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
+import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
+import LandingPage from './pages/LandingPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { ProjectDetailPage } from './pages/ProjectDetailPage';
@@ -26,6 +28,7 @@ import { SearchPage } from './pages/SearchPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { WorkspacePage } from './pages/WorkspacePage';
 import { OrganizationsPage } from './pages/OrganizationsPage';
+import NotFoundPage from './pages/NotFoundPage';
 import { useEffect } from 'react';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -65,6 +68,11 @@ export default function App() {
 
   return (
     <Routes>
+      <Route
+        path="/"
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />}
+      />
+
       <Route path="/auth" element={<AuthLayout />}>
         <Route
           path="login"
@@ -74,6 +82,7 @@ export default function App() {
           path="register"
           element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />}
         />
+        <Route path="forgot-password" element={<ForgotPasswordPage />} />
       </Route>
 
       <Route
@@ -116,6 +125,7 @@ export default function App() {
           }
         />
       </Route>
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

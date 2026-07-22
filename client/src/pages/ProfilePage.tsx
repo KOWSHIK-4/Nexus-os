@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { User, CalendarDays, ListChecks, FolderKanban, Activity } from 'lucide-react';
+import { CalendarDays, ListChecks, FolderKanban, Activity } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
@@ -73,7 +73,7 @@ export function ProfilePage() {
                 >
                   <Activity className="h-4 w-4 text-muted-foreground mt-1" />
                   <div className="flex-1">
-                    <p className="text-sm"><span className="font-medium">{item.action}</span> — {item.detail}</p>
+                    <p className="text-sm"><span className="font-medium">{item.action}</span> ï¿½ {item.detail}</p>
                     <p className="text-xs text-muted-foreground">{item.time}</p>
                   </div>
                 </motion.div>

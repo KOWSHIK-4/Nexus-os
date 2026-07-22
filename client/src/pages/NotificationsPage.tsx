@@ -2,7 +2,6 @@ import { motion } from 'framer-motion';
 import { Bell, CheckCheck, MessageSquare, ListChecks, Users, CalendarDays } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
 import { formatRelativeTime } from '../lib/utils';
 
 const notifications = [

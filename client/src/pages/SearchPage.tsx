@@ -3,9 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search as SearchIcon, FolderKanban, ListChecks, StickyNote, FileText, File, ArrowRight } from 'lucide-react';
 import { Input } from '../components/ui/input';
-import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
-import { cn } from '../lib/utils';
 
 const allResults = {
   projects: [

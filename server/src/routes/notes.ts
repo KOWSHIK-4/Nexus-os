@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth';
 import { prisma } from '../utils/prisma';
@@ -11,7 +10,6 @@ router.use(authenticate);
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const search = req.query.search as string | undefined;
-    const projectId = req.query.projectId as string | undefined;
     const userId = req.query.userId as string | undefined;
     const tags = req.query.tags as string | undefined;
 
@@ -24,13 +22,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       ];
     }
 
-    if (projectId) {
-      where.projectId = projectId;
-    }
-
-    if (userId) {
-      where.userId = userId;
-    } else if (req.user!.role !== 'ADMIN' && req.user!.role !== 'OWNER') {
+    if (userId) where.userId = userId;
+    if (req.user!.role !== 'ADMIN' && req.user!.role !== 'SUPER_ADMIN') {
       where.userId = req.user!.userId;
     }
 
@@ -41,10 +34,6 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     const notes = await prisma.note.findMany({
       where,
-      include: {
-        user: { select: { id: true, name: true, avatar: true } },
-        project: { select: { id: true, name: true } },
-      },
       orderBy: { updatedAt: 'desc' },
     });
 
@@ -56,23 +45,16 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { title, content, tags, projectId } = req.body;
-
-    if (!title) {
-      throw new AppError('Title is required', 400, 'VALIDATION_ERROR');
-    }
+    const { title, content, tags, color } = req.body;
+    if (!title) throw new AppError('Title is required', 400, 'VALIDATION_ERROR');
 
     const note = await prisma.note.create({
       data: {
         title,
         content: content || '',
         tags: tags || [],
+        color: color || null,
         userId: req.user!.userId,
-        projectId: projectId || null,
-      },
-      include: {
-        user: { select: { id: true, name: true, avatar: true } },
-        project: { select: { id: true, name: true } },
       },
     });
 
@@ -84,18 +66,8 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const note = await prisma.note.findUnique({
-      where: { id: req.params.id },
-      include: {
-        user: { select: { id: true, name: true, email: true, avatar: true } },
-        project: { select: { id: true, name: true } },
-      },
-    });
-
-    if (!note) {
-      throw new NotFoundError('Note');
-    }
-
+    const note = await prisma.note.findUnique({ where: { id: req.params.id } });
+    if (!note) throw new NotFoundError('Note');
     res.json({ data: note });
   } catch (error) {
     next(error);
@@ -104,12 +76,10 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 
 router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { title, content, tags, projectId } = req.body;
+    const { title, content, tags, color, isPinned } = req.body;
 
     const note = await prisma.note.findUnique({ where: { id: req.params.id } });
-    if (!note) {
-      throw new NotFoundError('Note');
-    }
+    if (!note) throw new NotFoundError('Note');
 
     const updated = await prisma.note.update({
       where: { id: req.params.id },
@@ -117,11 +87,8 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
         ...(title !== undefined && { title }),
         ...(content !== undefined && { content }),
         ...(tags !== undefined && { tags }),
-        ...(projectId !== undefined && { projectId: projectId || null }),
-      },
-      include: {
-        user: { select: { id: true, name: true, avatar: true } },
-        project: { select: { id: true, name: true } },
+        ...(color !== undefined && { color }),
+        ...(isPinned !== undefined && { isPinned }),
       },
     });
 
@@ -134,12 +101,9 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const note = await prisma.note.findUnique({ where: { id: req.params.id } });
-    if (!note) {
-      throw new NotFoundError('Note');
-    }
+    if (!note) throw new NotFoundError('Note');
 
     await prisma.note.delete({ where: { id: req.params.id } });
-
     res.json({ data: { message: 'Note deleted successfully' } });
   } catch (error) {
     next(error);

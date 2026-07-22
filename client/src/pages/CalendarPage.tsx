@@ -1,9 +1,7 @@
 import { motion } from 'framer-motion';
 import { useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, ListChecks } from 'lucide-react';
-import { Card, CardContent } from '../components/ui/card';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
 import { cn } from '../lib/utils';
 
 const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

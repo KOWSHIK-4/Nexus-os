@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth';
 import { prisma } from '../utils/prisma';
@@ -11,20 +10,18 @@ router.use(authenticate);
 router.get('/boards/:projectId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const project = await prisma.project.findUnique({ where: { id: req.params.projectId } });
-    if (!project) {
-      throw new NotFoundError('Project');
-    }
+    if (!project) throw new NotFoundError('Project');
 
     const boards = await prisma.kanbanBoard.findMany({
       where: { projectId: req.params.projectId },
       include: {
         columns: {
-          orderBy: { position: 'asc' },
+          orderBy: { order: 'asc' },
           include: {
             tasks: {
-              orderBy: { position: 'asc' },
+              orderBy: { order: 'asc' },
               include: {
-                assignee: { select: { id: true, name: true, email: true, avatar: true } },
+                assignee: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
               },
             },
           },
@@ -42,15 +39,10 @@ router.get('/boards/:projectId', async (req: Request, res: Response, next: NextF
 router.post('/boards', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, projectId } = req.body;
-
-    if (!name || !projectId) {
-      throw new AppError('Name and projectId are required', 400, 'VALIDATION_ERROR');
-    }
+    if (!name || !projectId) throw new AppError('Name and projectId are required', 400, 'VALIDATION_ERROR');
 
     const project = await prisma.project.findUnique({ where: { id: projectId } });
-    if (!project) {
-      throw new NotFoundError('Project');
-    }
+    if (!project) throw new NotFoundError('Project');
 
     const board = await prisma.kanbanBoard.create({
       data: { name, projectId },
@@ -58,15 +50,9 @@ router.post('/boards', async (req: Request, res: Response, next: NextFunction) =
     });
 
     const defaultColumns = ['To Do', 'In Progress', 'Review', 'Done'];
-    const positions = [0, 1000, 2000, 3000];
-
     for (let i = 0; i < defaultColumns.length; i++) {
       await prisma.kanbanColumn.create({
-        data: {
-          name: defaultColumns[i],
-          boardId: board.id,
-          position: positions[i],
-        },
+        data: { name: defaultColumns[i], boardId: board.id, order: i * 1000 },
       });
     }
 
@@ -74,8 +60,15 @@ router.post('/boards', async (req: Request, res: Response, next: NextFunction) =
       where: { id: board.id },
       include: {
         columns: {
-          orderBy: { position: 'asc' },
-          include: { tasks: true },
+          orderBy: { order: 'asc' },
+          include: {
+            tasks: {
+              orderBy: { order: 'asc' },
+              include: {
+                assignee: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
+              },
+            },
+          },
         },
       },
     });
@@ -89,16 +82,13 @@ router.post('/boards', async (req: Request, res: Response, next: NextFunction) =
 router.put('/boards/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name } = req.body;
-
     const board = await prisma.kanbanBoard.findUnique({ where: { id: req.params.id } });
-    if (!board) {
-      throw new NotFoundError('Board');
-    }
+    if (!board) throw new NotFoundError('Board');
 
     const updated = await prisma.kanbanBoard.update({
       where: { id: req.params.id },
       data: { ...(name !== undefined && { name }) },
-      include: { columns: { orderBy: { position: 'asc' } } },
+      include: { columns: { orderBy: { order: 'asc' } } },
     });
 
     res.json({ data: updated });
@@ -110,12 +100,9 @@ router.put('/boards/:id', async (req: Request, res: Response, next: NextFunction
 router.delete('/boards/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const board = await prisma.kanbanBoard.findUnique({ where: { id: req.params.id } });
-    if (!board) {
-      throw new NotFoundError('Board');
-    }
+    if (!board) throw new NotFoundError('Board');
 
     await prisma.kanbanBoard.delete({ where: { id: req.params.id } });
-
     res.json({ data: { message: 'Board deleted successfully' } });
   } catch (error) {
     next(error);
@@ -124,28 +111,22 @@ router.delete('/boards/:id', async (req: Request, res: Response, next: NextFunct
 
 router.post('/columns', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, boardId, position } = req.body;
-
-    if (!name || !boardId) {
-      throw new AppError('Name and boardId are required', 400, 'VALIDATION_ERROR');
-    }
+    const { name, boardId, order } = req.body;
+    if (!name || !boardId) throw new AppError('Name and boardId are required', 400, 'VALIDATION_ERROR');
 
     const board = await prisma.kanbanBoard.findUnique({ where: { id: boardId } });
-    if (!board) {
-      throw new NotFoundError('Board');
-    }
+    if (!board) throw new NotFoundError('Board');
 
-    let targetPosition = position;
-    if (targetPosition === undefined) {
-      const maxPos = await prisma.kanbanColumn.aggregate({
-        where: { boardId },
-        _max: { position: true },
+    let targetOrder = order;
+    if (targetOrder === undefined) {
+      const maxOrder = await prisma.kanbanColumn.aggregate({
+        where: { boardId }, _max: { order: true },
       });
-      targetPosition = (maxPos._max.position || 0) + 1000;
+      targetOrder = (maxOrder._max.order || 0) + 1000;
     }
 
     const column = await prisma.kanbanColumn.create({
-      data: { name, boardId, position: targetPosition },
+      data: { name, boardId, order: targetOrder },
     });
 
     res.status(201).json({ data: column });
@@ -156,19 +137,13 @@ router.post('/columns', async (req: Request, res: Response, next: NextFunction) 
 
 router.put('/columns/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { name, position } = req.body;
-
+    const { name, order } = req.body;
     const column = await prisma.kanbanColumn.findUnique({ where: { id: req.params.id } });
-    if (!column) {
-      throw new NotFoundError('Column');
-    }
+    if (!column) throw new NotFoundError('Column');
 
     const updated = await prisma.kanbanColumn.update({
       where: { id: req.params.id },
-      data: {
-        ...(name !== undefined && { name }),
-        ...(position !== undefined && { position }),
-      },
+      data: { ...(name !== undefined && { name }), ...(order !== undefined && { order }) },
     });
 
     res.json({ data: updated });
@@ -183,20 +158,16 @@ router.delete('/columns/:id', async (req: Request, res: Response, next: NextFunc
       where: { id: req.params.id },
       include: { tasks: true },
     });
-
-    if (!column) {
-      throw new NotFoundError('Column');
-    }
+    if (!column) throw new NotFoundError('Column');
 
     if (column.tasks.length > 0) {
       await prisma.task.updateMany({
-        where: { columnId: req.params.id },
-        data: { columnId: null },
+        where: { boardColumnId: req.params.id },
+        data: { boardColumnId: null },
       });
     }
 
     await prisma.kanbanColumn.delete({ where: { id: req.params.id } });
-
     res.json({ data: { message: 'Column deleted successfully' } });
   } catch (error) {
     next(error);
@@ -205,41 +176,33 @@ router.delete('/columns/:id', async (req: Request, res: Response, next: NextFunc
 
 router.put('/tasks/:id/move', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { columnId, position } = req.body;
-
-    if (!columnId) {
-      throw new AppError('columnId is required', 400, 'VALIDATION_ERROR');
-    }
+    const { columnId, order } = req.body;
+    if (!columnId) throw new AppError('columnId is required', 400, 'VALIDATION_ERROR');
 
     const task = await prisma.task.findUnique({ where: { id: req.params.id } });
-    if (!task) {
-      throw new NotFoundError('Task');
-    }
+    if (!task) throw new NotFoundError('Task');
 
     const column = await prisma.kanbanColumn.findUnique({ where: { id: columnId } });
-    if (!column) {
-      throw new NotFoundError('Column');
-    }
+    if (!column) throw new NotFoundError('Column');
 
-    let targetPosition = position;
-    if (targetPosition === undefined) {
-      const maxPos = await prisma.task.aggregate({
-        where: { columnId },
-        _max: { position: true },
+    let targetOrder = order;
+    if (targetOrder === undefined) {
+      const maxOrder = await prisma.task.aggregate({
+        where: { boardColumnId: columnId }, _max: { order: true },
       });
-      targetPosition = (maxPos._max.position || 0) + 1000;
+      targetOrder = (maxOrder._max.order || 0) + 1000;
     }
 
     const updated = await prisma.task.update({
       where: { id: req.params.id },
       data: {
-        columnId,
-        position: targetPosition,
+        boardColumnId: columnId,
+        order: targetOrder,
         status: column.name === 'Done' ? 'DONE' : task.status === 'DONE' ? 'TODO' : task.status,
       },
       include: {
-        assignee: { select: { id: true, name: true, email: true, avatar: true } },
-        column: { select: { id: true, name: true } },
+        assignee: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
+        boardColumn: { select: { id: true, name: true } },
       },
     });
 

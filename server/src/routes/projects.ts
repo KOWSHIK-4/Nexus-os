@@ -1,12 +1,20 @@
-// @ts-nocheck
 import { Router, Request, Response, NextFunction } from 'express';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate } from '../middleware/auth';
 import { prisma } from '../utils/prisma';
 import { AppError, NotFoundError, ForbiddenError, ConflictError } from '../utils/errors';
 
 const router = Router();
 
 router.use(authenticate);
+
+function generateProjectKey(name: string): string {
+  return name
+    .split(/\s+/)
+    .map(w => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 6);
+}
 
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -27,31 +35,25 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       ];
     }
 
-    if (status) {
-      where.status = status;
-    }
+    if (status) where.status = status;
+    if (organizationId) where.organizationId = organizationId;
+    if (ownerId) where.ownerId = ownerId;
 
-    if (organizationId) {
-      where.organizationId = organizationId;
-    }
-
-    if (ownerId) {
-      where.ownerId = ownerId;
-    }
-
-    if (req.user!.role !== 'ADMIN' && req.user!.role !== 'OWNER') {
-      where.OR = [
-        ...(where.OR || []),
+    if (req.user!.role !== 'ADMIN' && req.user!.role !== 'SUPER_ADMIN') {
+      const userFilter = [
         { ownerId: req.user!.userId },
         { members: { some: { userId: req.user!.userId } } },
       ];
+      where.OR = where.OR
+        ? [...(where.OR as unknown as Record<string, unknown>[]), ...userFilter]
+        : userFilter;
     }
 
     const [projects, total] = await Promise.all([
       prisma.project.findMany({
         where,
         include: {
-          owner: { select: { id: true, name: true, email: true, avatar: true } },
+          owner: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
           _count: { select: { members: true, tasks: true } },
         },
         skip,
@@ -73,21 +75,16 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, description, status, organizationId } = req.body;
-
-    if (!name) {
-      throw new AppError('Project name is required', 400, 'VALIDATION_ERROR');
-    }
+    if (!name) throw new AppError('Project name is required', 400, 'VALIDATION_ERROR');
 
     const project = await prisma.project.create({
       data: {
         name,
+        key: generateProjectKey(name),
         description,
         status: status || 'ACTIVE',
         ownerId: req.user!.userId,
         organizationId: organizationId || req.user!.organizationId,
-      },
-      include: {
-        owner: { select: { id: true, name: true, email: true, avatar: true } },
       },
     });
 
@@ -95,11 +92,19 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       data: {
         projectId: project.id,
         userId: req.user!.userId,
-        role: 'OWNER',
+        role: 'ADMIN',
       },
     });
 
-    res.status(201).json({ data: project });
+    const full = await prisma.project.findUnique({
+      where: { id: project.id },
+      include: {
+        owner: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
+        _count: { select: { members: true, tasks: true } },
+      },
+    });
+
+    res.status(201).json({ data: full });
   } catch (error) {
     next(error);
   }
@@ -110,19 +115,17 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const project = await prisma.project.findUnique({
       where: { id: req.params.id },
       include: {
-        owner: { select: { id: true, name: true, email: true, avatar: true } },
+        owner: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
         members: {
           include: {
-            user: { select: { id: true, name: true, email: true, avatar: true, role: true } },
+            user: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true, role: true } },
           },
         },
-        _count: { select: { tasks: true, documents: true, notes: true } },
+        _count: { select: { tasks: true, members: true } },
       },
     });
 
-    if (!project) {
-      throw new NotFoundError('Project');
-    }
+    if (!project) throw new NotFoundError('Project');
 
     res.json({ data: project });
   } catch (error) {
@@ -135,11 +138,9 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const { name, description, status } = req.body;
 
     const project = await prisma.project.findUnique({ where: { id: req.params.id } });
-    if (!project) {
-      throw new NotFoundError('Project');
-    }
+    if (!project) throw new NotFoundError('Project');
 
-    if (project.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN' && req.user!.role !== 'OWNER') {
+    if (project.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN' && req.user!.role !== 'SUPER_ADMIN') {
       throw new ForbiddenError('You do not have permission to update this project');
     }
 
@@ -151,7 +152,7 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
         ...(status !== undefined && { status }),
       },
       include: {
-        owner: { select: { id: true, name: true, email: true, avatar: true } },
+        owner: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
       },
     });
 
@@ -164,16 +165,13 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const project = await prisma.project.findUnique({ where: { id: req.params.id } });
-    if (!project) {
-      throw new NotFoundError('Project');
-    }
+    if (!project) throw new NotFoundError('Project');
 
-    if (project.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN' && req.user!.role !== 'OWNER') {
+    if (project.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN' && req.user!.role !== 'SUPER_ADMIN') {
       throw new ForbiddenError('You do not have permission to delete this project');
     }
 
     await prisma.project.delete({ where: { id: req.params.id } });
-
     res.json({ data: { message: 'Project deleted successfully' } });
   } catch (error) {
     next(error);
@@ -183,41 +181,27 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
 router.post('/:id/members', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { userId, role } = req.body;
-
-    if (!userId) {
-      throw new AppError('userId is required', 400, 'VALIDATION_ERROR');
-    }
+    if (!userId) throw new AppError('userId is required', 400, 'VALIDATION_ERROR');
 
     const project = await prisma.project.findUnique({ where: { id: req.params.id } });
-    if (!project) {
-      throw new NotFoundError('Project');
-    }
+    if (!project) throw new NotFoundError('Project');
 
-    if (project.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN' && req.user!.role !== 'OWNER') {
+    if (project.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN' && req.user!.role !== 'SUPER_ADMIN') {
       throw new ForbiddenError('You do not have permission to add members');
     }
 
     const userExists = await prisma.user.findUnique({ where: { id: userId } });
-    if (!userExists) {
-      throw new NotFoundError('User');
-    }
+    if (!userExists) throw new NotFoundError('User');
 
     const existing = await prisma.projectMember.findUnique({
       where: { projectId_userId: { projectId: req.params.id, userId } },
     });
-
-    if (existing) {
-      throw new ConflictError('User is already a member of this project');
-    }
+    if (existing) throw new ConflictError('User is already a member of this project');
 
     const member = await prisma.projectMember.create({
-      data: {
-        projectId: req.params.id,
-        userId,
-        role: role || 'MEMBER',
-      },
+      data: { projectId: req.params.id, userId, role: role || 'MEMBER' },
       include: {
-        user: { select: { id: true, name: true, email: true, avatar: true } },
+        user: { select: { id: true, firstName: true, lastName: true, email: true, avatar: true } },
       },
     });
 
@@ -230,11 +214,9 @@ router.post('/:id/members', async (req: Request, res: Response, next: NextFuncti
 router.delete('/:id/members/:userId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const project = await prisma.project.findUnique({ where: { id: req.params.id } });
-    if (!project) {
-      throw new NotFoundError('Project');
-    }
+    if (!project) throw new NotFoundError('Project');
 
-    if (project.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN' && req.user!.role !== 'OWNER') {
+    if (project.ownerId !== req.user!.userId && req.user!.role !== 'ADMIN' && req.user!.role !== 'SUPER_ADMIN') {
       throw new ForbiddenError('You do not have permission to remove members');
     }
 
@@ -245,10 +227,7 @@ router.delete('/:id/members/:userId', async (req: Request, res: Response, next: 
     const member = await prisma.projectMember.findUnique({
       where: { projectId_userId: { projectId: req.params.id, userId: req.params.userId } },
     });
-
-    if (!member) {
-      throw new NotFoundError('Member');
-    }
+    if (!member) throw new NotFoundError('Member');
 
     await prisma.projectMember.delete({
       where: { projectId_userId: { projectId: req.params.id, userId: req.params.userId } },

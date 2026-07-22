@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Building2, Plus, Users, Mail, Shield } from 'lucide-react';
+import { Building2, Users, Mail, Shield } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -54,7 +54,7 @@ export function OrganizationsPage() {
             </div>
             <div>
               <h3 className="font-semibold text-lg">Nexus OS Inc.</h3>
-              <p className="text-sm text-muted-foreground">Technology · 12 members</p>
+              <p className="text-sm text-muted-foreground">Technology ï¿½ 12 members</p>
             </div>
           </div>
         </CardContent>

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Users, Plus, Mail, Shield, MoreHorizontal } from 'lucide-react';
+import { Users, Plus, Shield } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
