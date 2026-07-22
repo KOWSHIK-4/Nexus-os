@@ -22,7 +22,7 @@ const projectData = {
 };
 
 export function ProjectDetailPage() {
-  const { id } = useParams();
+  useParams();
   const [activeTab, setActiveTab] = useState('overview');
 
   const completionPercent = (projectData.stats.completedTasks / projectData.stats.totalTasks) * 100;

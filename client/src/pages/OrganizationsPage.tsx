@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Avatar, AvatarFallback } from '../components/ui/avatar';
-import { Input } from '../components/ui/input';
 
 const orgMembers = [
   { id: '1', name: 'John Doe', email: 'john@nexusos.app', role: 'OWNER' },

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth';
 import { prisma } from '../utils/prisma';
@@ -91,8 +90,9 @@ router.post('/generate/tasks', async (req: Request, res: Response, next: NextFun
         data: {
           title: task.title,
           description: task.description || '',
-          priority: ['LOW', 'MEDIUM', 'HIGH', 'URGENT'].includes(task.priority) ? task.priority as any : 'MEDIUM',
-          projectId: projectId || null,
+          priority: (['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const).includes(task.priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT') ? task.priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' : 'MEDIUM',
+          reporterId: req.user!.userId,
+          projectId: projectId ? (projectId as string) : null,
         },
       });
       created.push(createdTask);

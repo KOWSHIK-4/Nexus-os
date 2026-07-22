@@ -22,7 +22,7 @@ const allResults = {
   ],
 };
 
-const typeIcons: Record<string, any> = {
+const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   Project: FolderKanban,
   Task: ListChecks,
   Note: StickyNote,
@@ -72,7 +72,7 @@ export function SearchPage() {
                             <p className="text-sm font-medium">{item.title}</p>
                             <div className="flex items-center gap-2">
                               <Badge variant="secondary" className="text-[10px]">{item.type}</Badge>
-                              {'status' in item && <Badge variant="outline" className="text-[10px]">{(item as any).status}</Badge>}
+                              {'status' in item && <Badge variant="outline" className="text-[10px]">{(item as { status: string }).status}</Badge>}
                             </div>
                           </div>
                         </div>

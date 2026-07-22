@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, User, MessageSquare, Clock } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -20,7 +20,7 @@ const taskDetail = {
 };
 
 export function TaskDetailPage() {
-  const { id } = useParams();
+  useParams();
   const navigate = useNavigate();
   const [newComment, setNewComment] = useState('');
 

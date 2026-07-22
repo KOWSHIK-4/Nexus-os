@@ -26,6 +26,15 @@ interface AuthState {
   clearError: () => void;
 }
 
+function extractErrorMessage(error: unknown): string | null {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const err = error as { response?: { data?: { error?: { message?: string } } } };
+    return err.response?.data?.error?.message || null;
+  }
+  if (error instanceof Error) return error.message;
+  return null;
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
@@ -53,8 +62,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { data } = await api.post('/auth/login', { email, password });
       localStorage.setItem('accessToken', data.data.accessToken);
       set({ user: data.data.user, isAuthenticated: true, isLoading: false });
-    } catch (error: any) {
-      const message = error?.response?.data?.error?.message || 'Login failed';
+    } catch (error: unknown) {
+      const message = extractErrorMessage(error) || 'Login failed';
       set({ error: message, isLoading: false });
       throw new Error(message);
     }
@@ -66,8 +75,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { data } = await api.post('/auth/register', registerData);
       localStorage.setItem('accessToken', data.data.accessToken);
       set({ user: data.data.user, isAuthenticated: true, isLoading: false });
-    } catch (error: any) {
-      const message = error?.response?.data?.error?.message || 'Registration failed';
+    } catch (error: unknown) {
+      const message = extractErrorMessage(error) || 'Registration failed';
       set({ error: message, isLoading: false });
       throw new Error(message);
     }
@@ -88,8 +97,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { data } = await api.put('/auth/me', profileData);
       set({ user: { ...get().user!, ...data.data } });
-    } catch (error: any) {
-      const message = error?.response?.data?.error?.message || 'Update failed';
+    } catch (error: unknown) {
+      const message = extractErrorMessage(error) || 'Update failed';
       set({ error: message });
       throw new Error(message);
     }

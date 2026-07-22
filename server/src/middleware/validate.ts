@@ -12,8 +12,8 @@ export const validate = (schema: ZodSchema) => {
       });
 
       req.body = parsed.body;
-      req.query = parsed.query as any;
-      req.params = parsed.params as any;
+      req.query = parsed.query as Record<string, string>;
+      req.params = parsed.params as Record<string, string>;
 
       next();
     } catch (error) {

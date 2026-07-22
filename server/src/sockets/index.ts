@@ -107,7 +107,7 @@ export const setupSocketHandlers = (io: SocketIOServer): void => {
             userId: data.userId,
             title: data.title,
             message: data.message,
-            type: data.type as any,
+            type: data.type as 'TASK_ASSIGNED' | 'TASK_UPDATED' | 'COMMENT_ADDED' | 'MENTION' | 'PROJECT_INVITE' | 'TEAM_INVITE' | 'DEADLINE_REMINDER' | 'STATUS_CHANGE',
           },
         });
 

@@ -29,7 +29,7 @@ router.put('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user!.organizationId) throw new AppError('You are not part of an organization', 400, 'NO_ORGANIZATION');
 
-    const { name, logo } = req.body;
+    const { name } = req.body;
     const organization = await prisma.organization.findUnique({ where: { id: req.user!.organizationId } });
     if (!organization) throw new NotFoundError('Organization');
 
