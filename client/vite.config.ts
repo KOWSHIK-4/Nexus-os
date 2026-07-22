@@ -39,6 +39,15 @@ export default defineConfig({
           if (id.includes('node_modules/recharts')) {
             return 'charts';
           }
+          if (id.includes('node_modules/framer-motion')) {
+            return 'animations';
+          }
+          if (id.includes('node_modules/@tanstack/react-query')) {
+            return 'query';
+          }
+          if (id.includes('node_modules/lucide-react')) {
+            return 'icons';
+          }
         },
       },
     },

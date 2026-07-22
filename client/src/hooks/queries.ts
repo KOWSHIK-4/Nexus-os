@@ -3,6 +3,7 @@ import { projectsService } from '../services/projects';
 import { tasksService } from '../services/tasks';
 import { notificationsService } from '../services/notifications';
 import { aiService } from '../services/ai';
+import { api } from '../lib/api';
 
 export function useProjects(params?: Record<string, unknown>) {
   return useQuery({
@@ -108,5 +109,41 @@ export function useMarkAllNotificationsRead() {
 export function useAIChat() {
   return useMutation({
     mutationFn: ({ message, context }: { message: string; context?: string }) => aiService.chat(message, context),
+  });
+}
+
+export function useAnalytics(type: 'dashboard' | 'projects' | 'tasks' | 'team') {
+  return useQuery({
+    queryKey: ['analytics', type],
+    queryFn: () => api.get(`/analytics/${type}`).then(r => r.data),
+  });
+}
+
+export function useTeams() {
+  return useQuery({
+    queryKey: ['teams'],
+    queryFn: () => api.get('/teams').then(r => r.data),
+  });
+}
+
+export function useUsers() {
+  return useQuery({
+    queryKey: ['users'],
+    queryFn: () => api.get('/users').then(r => r.data),
+  });
+}
+
+export function useCalendarEvents(params?: { start?: string; end?: string; projectId?: string }) {
+  return useQuery({
+    queryKey: ['calendar-events', params],
+    queryFn: () => api.get('/calendar/events', { params }).then(r => r.data),
+  });
+}
+
+export function useSearch(query: string) {
+  return useQuery({
+    queryKey: ['search', query],
+    queryFn: () => api.get('/search', { params: { q: query } }).then(r => r.data),
+    enabled: query.length > 0,
   });
 }

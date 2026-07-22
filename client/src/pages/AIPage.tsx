@@ -1,35 +1,48 @@
 import { motion } from 'framer-motion';
 import { useState } from 'react';
-import { Bot, Send, Sparkles, ListChecks, FileText, Code, Mail, Briefcase, BookOpen } from 'lucide-react';
+import { Bot, Send, Sparkles, ListChecks, FileText, Code, Mail, Briefcase, BookOpen, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { ScrollArea } from '../components/ui/scroll-area';
+import { useAIChat } from '../hooks/queries';
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
 
 const quickActions = [
-  { icon: ListChecks, label: 'Generate Tasks', prompt: 'Generate tasks for...' },
-  { icon: FileText, label: 'Summarize', prompt: 'Summarize this...' },
-  { icon: Code, label: 'Code Review', prompt: 'Review this code...' },
-  { icon: Mail, label: 'Write Email', prompt: 'Write an email about...' },
-  { icon: Briefcase, label: 'Project Plan', prompt: 'Create a project plan for...' },
-  { icon: BookOpen, label: 'Documentation', prompt: 'Generate docs for...' },
+  { icon: ListChecks, label: 'Generate Tasks', prompt: 'Generate tasks for a new project management feature including user stories and technical tasks' },
+  { icon: FileText, label: 'Summarize', prompt: 'Summarize the key principles of agile project management' },
+  { icon: Code, label: 'Code Review', prompt: 'Review this code for potential issues: function fetchData(url) { return fetch(url).then(r => r.json()) }' },
+  { icon: Mail, label: 'Write Email', prompt: 'Write a professional email announcing a new project kickoff to the team' },
+  { icon: Briefcase, label: 'Project Plan', prompt: 'Create a project plan for building a real-time chat application with WebSocket support' },
+  { icon: BookOpen, label: 'Documentation', prompt: 'Generate documentation for a REST API endpoint that handles user authentication' },
 ];
 
-const initialMessages = [
+const initialMessages: Message[] = [
   { role: 'assistant', content: 'Hello! I am your AI assistant. How can I help you today? I can help with tasks, code reviews, documentation, and more.' },
 ];
 
 export function AIPage() {
-  const [messages, setMessages] = useState(initialMessages);
+  const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState('');
+  const { mutateAsync: chat, isPending } = useAIChat();
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
-    setMessages([...messages, { role: 'user', content: input }]);
+  const sendMessage = async () => {
+    if (!input.trim() || isPending) return;
+    const userMessage: Message = { role: 'user', content: input };
+    setMessages(prev => [...prev, userMessage]);
     setInput('');
-    setTimeout(() => {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'I understand your request. Let me work on that for you. This is a simulated response - the AI integration will be connected to OpenAI in production.' }]);
-    }, 1000);
+
+    try {
+      const result = await chat({ message: input });
+      const reply = result?.data?.reply || 'I apologize, but I encountered an issue processing your request.';
+      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'I apologize, but I encountered an error. Please check your connection and try again.' }]);
+    }
   };
 
   return (
@@ -78,10 +91,17 @@ export function AIPage() {
                           ? 'bg-primary text-primary-foreground'
                           : 'bg-secondary text-foreground'
                       }`}>
-                        <p className="text-sm">{msg.content}</p>
+                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                       </div>
                     </motion.div>
                   ))}
+                  {isPending && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
+                      <div className="bg-secondary text-foreground p-3 rounded-lg">
+                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
               </ScrollArea>
             </CardContent>
@@ -93,8 +113,9 @@ export function AIPage() {
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && sendMessage()}
                   className="flex-1"
+                  disabled={isPending}
                 />
-                <Button size="icon" onClick={sendMessage}>
+                <Button size="icon" onClick={sendMessage} disabled={isPending || !input.trim()}>
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
